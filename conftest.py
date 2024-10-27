@@ -8,36 +8,30 @@ def generate_random_string(length=10):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 @pytest.fixture
 def register_new_user_and_return_login_password():
-    """Регистрация пользователя и возврат его данных для тестов."""
+    """Регистрация нового пользователя и получение токенов."""
     email = f"user_{generate_random_string(8)}@yandex.ru"
     password = generate_random_string(10)
     name = generate_random_string(6)
 
-    # Формируем тело запроса
-    payload = {
-        "email": email,
-        "password": password,
-        "name": name
-    }
-
-    # Отправляем запрос на создание пользователя
+    # Регистрация пользователя
+    payload = {"email": email, "password": password, "name": name}
     response = requests.post(REGISTER_URL, json=payload)
     assert response.status_code == 200, f"Ошибка регистрации: {response.text}"
 
-    # Возвращаем данные пользователя для использования в тестах
-    yield {"name": name, "email": email, "password": password}
-
-    # Выполним логаут после завершения тестов, используя refreshToken
-    login_response = requests.post(LOGIN_URL, json={
-        "email": email,
-        "password": password
-    })
+    # Логин и получение токенов
+    login_response = requests.post(LOGIN_URL, json={"email": email, "password": password})
     assert login_response.status_code == 200, f"Ошибка авторизации: {login_response.text}"
+    tokens = login_response.json()
+    access_token = tokens["accessToken"]
+    refresh_token = tokens["refreshToken"]
 
-    refresh_token = login_response.json().get("refreshToken")
+    # Возвращаем данные пользователя и токены
+    yield {"email": email, "password": password, "name": name,
+           "access_token": access_token, "refresh_token": refresh_token}
+
+    # Логаут после завершения тестов
     headers = {"Content-Type": "application/json"}
     logout_response = requests.post(LOGOUT_URL, headers=headers, json={"token": refresh_token})
-
     assert logout_response.status_code == 200, f"Ошибка выхода: {logout_response.text}"
 
 @pytest.fixture
@@ -56,26 +50,9 @@ def auth_token(register_new_user_and_return_login_password):
     return tokens["accessToken"], tokens["refreshToken"]
 
 @pytest.fixture
-def order_user_token():
-    """Регистрация пользователя и получение access_token для заказа."""
-    email = f"user_{generate_random_string(8)}@yandex.ru"
-    password = generate_random_string(10)
-    name = generate_random_string(6)
-
-    # Регистрация пользователя
-    data = {"email": email, "password": password, "name": name}
-    response = requests.post(REGISTER_URL, json=data)
-    assert response.status_code == 200, f"Ошибка регистрации: {response.text}"
-
-    # Авторизация и получение access_token
-    login_response = requests.post(LOGIN_URL, json={"email": email, "password": password})
-    assert login_response.status_code == 200, f"Ошибка авторизации: {login_response.text}"
-
-    access_token = login_response.json().get("accessToken")
-
-    # Возвращаем только access_token
-    yield access_token
-
+def order_user_token(register_new_user_and_return_login_password):
+    """Получение access_token для заказов."""
+    return register_new_user_and_return_login_password["access_token"]
 
 @pytest.fixture
 def valid_ingredients():

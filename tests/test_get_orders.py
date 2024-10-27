@@ -2,7 +2,6 @@ import requests
 import allure
 from urls import ORDER_URL, ALL_ORDERS_URL
 from data import STATUS_CODE_OK, STATUS_CODE_UNAUTHORIZED
-
 @allure.feature("Получение заказов")
 class TestGetOrders:
     @allure.title("Получение заказов c авторизации")
